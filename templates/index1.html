@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocExtract</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #07080a;
+      --surface:    #0e1014;
+      --surface2:   #13161b;
+      --border:     rgba(255,255,255,0.07);
+      --border-hi:  rgba(255,255,255,0.14);
+      --text:       #e8eaed;
+      --text-dim:   #6b7280;
+      --text-dimmer:#3d4450;
+      --accent:     #5cffa0;
+      --accent-dim: rgba(92,255,160,0.12);
+      --accent-glow:rgba(92,255,160,0.25);
+      --red:        #ff5f6d;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Sora', sans-serif;
+      --r: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 56px 20px 80px;
+      /* subtle noise grain */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    }
+
+    /* ── Layout ──────────────────────────────── */
+    .wrap {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* ── Header ──────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 52px;
+      opacity: 0;
+      animation: rise 0.55s 0.05s ease forwards;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-icon svg { width: 16px; height: 16px; }
+
+    .logo-text {
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .logo-text span {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      margin-left: 3px;
+    }
+
+    .pill {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 400;
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 12px;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Upload Zone ─────────────────────────── */
+    .drop-wrap {
+      opacity: 0;
+      animation: rise 0.55s 0.12s ease forwards;
+    }
+
+    .drop {
+      position: relative;
+      border: 1.5px dashed var(--border-hi);
+      border-radius: var(--r);
+      background: var(--surface);
+      padding: 64px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+
+    /* Corner accents */
+    .drop::before, .drop::after {
+      content: '';
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: var(--accent);
+      border-style: solid;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    .drop::before { top: 12px; left: 12px; border-width: 1.5px 0 0 1.5px; border-radius: 3px 0 0 0; }
+    .drop::after  { bottom: 12px; right: 12px; border-width: 0 1.5px 1.5px 0; border-radius: 0 0 3px 0; }
+
+    .drop:hover, .drop.over {
+      border-color: var(--accent);
+      background: var(--surface2);
+      box-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .drop:hover::before, .drop:hover::after,
+    .drop.over::before, .drop.over::after { opacity: 1; }
+
+    .drop input {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+
+    .drop-icon {
+      margin: 0 auto 20px;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border-hi);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+
+    .drop:hover .drop-icon, .drop.over .drop-icon {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      transform: scale(1.06);
+    }
+
+    .drop-icon svg { width: 22px; height: 22px; stroke: var(--text-dim); transition: stroke 0.2s; }
+    .drop:hover .drop-icon svg, .drop.over .drop-icon svg { stroke: var(--accent); }
+
+    .drop-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .drop-sub {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    .drop-types {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+    }
+
+    .type-badge {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--text-dimmer);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Status ──────────────────────────────── */
+    .status {
+      display: none;
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status.visible { display: flex; }
+    .status.error { color: var(--red); border-color: rgba(255,95,109,0.25); }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 1.5px solid var(--border-hi);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .status.error .spinner { display: none; }
+
+    /* ── Results ─────────────────────────────── */
+    .results {
+      display: none;
+      margin-top: 36px;
+      opacity: 0;
+      animation: rise 0.4s ease forwards;
+    }
+
+    .results.visible { display: block; }
+
+    /* doc type header */
+    .doc-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .doc-type {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(92,255,160,0.3);
+      border-radius: 6px;
+      padding: 5px 12px;
+    }
+
+    .doc-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .card-head-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 400;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .card-count {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--text-dimmer);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 7px;
+    }
+
+    .toggle-icon {
+      width: 18px; height: 18px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-dimmer);
+      transition: transform 0.2s;
+    }
+
+    .toggle-icon svg { width: 14px; height: 14px; }
+    .card.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+    .card-body { padding: 0 20px; }
+    .card.collapsed .card-body { display: none; }
+
+    /* field rows */
+    .field {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field:last-child { border-bottom: none; }
+
+    .field-k {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      min-width: 120px;
+      padding-top: 1px;
+    }
+
+    .field-v {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--text);
+      text-align: right;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
+    .field-v.mono { font-family: var(--mono); font-size: 0.82rem; }
+    .field-v.empty { color: var(--text-dimmer); font-style: italic; }
+
+    /* json block */
+    .json-wrap { padding: 20px 0; }
+
+    pre {
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    pre::-webkit-scrollbar { width: 4px; }
+    pre::-webkit-scrollbar-track { background: transparent; }
+    pre::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    /* copy button */
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .copy-btn:hover { color: var(--accent); border-color: rgba(92,255,160,0.3); }
+    .copy-btn svg { width: 11px; height: 11px; }
+
+    /* ── Footer ──────────────────────────────── */
+    .footer {
+      margin-top: 52px;
+      text-align: center;
+      font-size: 0.74rem;
+      color: var(--text-dimmer);
+      font-family: var(--mono);
+    }
+
+    /* ── Animations ──────────────────────────── */
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#5cffa0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="9" y1="13" x2="15" y2="13"/>
+          <line x1="9" y1="17" x2="13" y2="17"/>
+        </svg>
+      </div>
+      <div class="logo-text">DocExtract<span></span></div>
+    </div>
+    <span class="pill">AI · PDF · IMG</span>
+  </header>
+
+  <!-- Upload Zone -->
+  <div class="drop-wrap">
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" />
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 16 12 12 8 16"/>
+          <line x1="12" y1="12" x2="12" y2="21"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+      </div>
+      <p class="drop-title">Drop a document to extract</p>
+      <p class="drop-sub">or click anywhere to browse files</p>
+      <div class="drop-types">
+        <span class="type-badge">PDF</span>
+        <span class="type-badge">PNG</span>
+        <span class="type-badge">JPG</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="status">
+    <div class="spinner"></div>
+    <span id="statusText">Processing document…</span>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="doc-header">
+      <div class="doc-type" id="docType">Unknown Type</div>
+      <div class="doc-line"></div>
+    </div>
+
+    <!-- Fields Card -->
+    <div class="card" id="fieldsCard">
+      <div class="card-head" onclick="toggleCard('fieldsCard')">
+        <div class="card-head-left">
+          <span class="card-label">Extracted Fields</span>
+          <span class="card-count" id="fieldCount">0 fields</span>
+        </div>
+        <div class="toggle-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+      <div class="card-body" id="fieldsContainer"></div>
+    </div>
+
+    <!-- JSON Card -->
+    <div class="card collapsed" id="jsonCard">
+      <div class="card-head" onclick="toggleCard('jsonCard')">
+        <div class="card-head-left">
+          <span class="card-label">Raw JSON</span>
+        </div>
+        <div class="card-head-left" style="gap:8px">
+          <button class="copy-btn" onclick="copyJson(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span id="copyLabel">copy</span>
+          </button>
+          <div class="toggle-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="card-body json-wrap">
+        <pre id="jsonOutput"></pre>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">DocExtract — AI-powered field extraction</footer>
+</div>
+
+<script>
+  const fileInput  = document.getElementById('fileInput');
+  const dropZone   = document.getElementById('dropZone');
+  const statusEl   = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const resultsEl  = document.getElementById('results');
+  const fieldsContainer = document.getElementById('fieldsContainer');
+  const jsonOutput = document.getElementById('jsonOutput');
+  const docType    = document.getElementById('docType');
+  const fieldCount = document.getElementById('fieldCount');
+
+  let lastJson = null;
+
+  // ── Drag & drop ──────────────────────────────────────
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
+  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('over');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  // ── Main handler ─────────────────────────────────────
+  async function handleFile(file) {
+    resultsEl.style.display = 'none';
+    resultsEl.classList.remove('visible');
+    statusEl.className = 'status visible';
+    statusText.textContent = `Analysing ${file.name}…`;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/extract', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Server error during extraction.');
+
+      renderResults(data);
+    } catch (err) {
+      statusEl.className = 'status visible error';
+      statusText.textContent = err.message;
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────
+  function formatValue(val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (Array.isArray(val)) return val.map(formatValue).filter(Boolean).join('<br>');
+    if (typeof val === 'object') {
+      return Object.entries(val)
+        .map(([k, v]) => `<span style="color:var(--text-dimmer);font-size:.78em;font-family:var(--mono);text-transform:uppercase;">${k.replace(/_/g,' ')}</span> ${formatValue(v)}`)
+        .join('<br>');
+    }
+    return String(val);
+  }
+
+  function renderResults(data) {
+    statusEl.className = 'status'; // hide
+    lastJson = data;
+
+    const type = data.document_type || data.form_type || 'Document';
+    docType.textContent = type;
+
+    const extracted = data.extracted_data || data;
+    fieldsContainer.innerHTML = '';
+
+    let count = 0;
+    for (const [key, value] of Object.entries(extracted)) {
+      if (key === 'document_type' || key === 'form_type') continue;
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const fval = formatValue(value);
+      const div = document.createElement('div');
+      div.className = 'field';
+      const isMono = typeof value === 'number' || (typeof value === 'string' && /^[\d\-\/\.]+$/.test(value.trim()));
+      div.innerHTML = `
+        <div class="field-k">${label}</div>
+        <div class="field-v ${isMono ? 'mono' : ''} ${!fval ? 'empty' : ''}">${fval || 'not found'}</div>
+      `;
+      fieldsContainer.appendChild(div);
+      count++;
+    }
+
+    fieldCount.textContent = `${count} field${count !== 1 ? 's' : ''}`;
+    jsonOutput.textContent = JSON.stringify(data, null, 2);
+
+    resultsEl.style.display = 'block';
+    // Force reflow to trigger animation
+    void resultsEl.offsetWidth;
+    resultsEl.classList.add('visible');
+    resultsEl.style.opacity = '';
+    resultsEl.style.animation = 'rise 0.4s ease forwards';
+  }
+
+  // ── Collapsible cards ─────────────────────────────────
+  function toggleCard(id) {
+    document.getElementById(id).classList.toggle('collapsed');
+  }
+
+  // ── Copy JSON ─────────────────────────────────────────
+  function copyJson(e) {
+    e.stopPropagation();
+    if (!lastJson) return;
+    navigator.clipboard.writeText(JSON.stringify(lastJson, null, 2)).then(() => {
+      const label = document.getElementById('copyLabel');
+      label.textContent = 'copied!';
+      setTimeout(() => label.textContent = 'copy', 1800);
+    });
+  }
+</script>
+
+</body>
+</html>
