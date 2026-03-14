@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocExtract | Minimal</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #121212;
+            --border: #2a2a2a;
+            --text: #ededed;
+            --text-muted: #888888;
+            --accent: #00e891;
+            --font-mono: 'Menlo', 'Monaco', 'Courier New', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span { color: var(--accent); font-family: var(--font-mono); font-size: 1.2rem;}
+
+        .upload-zone {
+            border: 1px dashed var(--border);
+            background: var(--surface);
+            padding: 60px 20px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: #111a16;
+        }
+
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .upload-text {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .upload-text strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            display: none;
+        }
+
+        .results {
+            display: none;
+            margin-top: 40px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .tag {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            background: #111a16;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .card h2 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            font-family: var(--font-mono);
+        }
+
+        .field-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .field-row:last-child { border-bottom: none; }
+
+        .field-key {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .field-val {
+            font-weight: 500;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-word;
+        }
+
+        pre {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .error { color: #ff5555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>DocExtract <span></span></h1>
+    </header>
+
+    <div class="upload-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
+        <div class="upload-text">
+            <strong>Choose a file</strong> or drag it here
+            <br><span style="font-size: 0.8rem; margin-top: 8px; display: inline-block;">Supports PDF, PNG, JPG</span>
+        </div>
+    </div>
+
+    <div id="status">Processing document. This may take a moment...</div>
+
+    <div class="results" id="results">
+        <div class="tag" id="formType">Document Type</div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>Extracted Fields</h2>
+                <div id="fieldsContainer"></div>
+            </div>
+            
+            <div class="card">
+                <h2>Raw JSON</h2>
+                <pre id="jsonOutput"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const fieldsContainer = document.getElementById('fieldsContainer');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const formType = document.getElementById('formType');
+
+    // Drag and drop styles
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+        resultsEl.style.display = 'none';
+        statusEl.style.display = 'block';
+        statusEl.className = '';
+        statusEl.innerText = `Processing ${file.name}... executing extraction chain.`;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/extract', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Server error occurred during extraction.');
+            }
+
+            renderResults(data);
+        } catch (error) {
+            statusEl.innerText = `Error: ${error.message}`;
+            statusEl.className = 'error';
+        }
+    }
+
+    // Helper to format nested objects and arrays nicely
+    function formatValue(val) {
+        if (Array.isArray(val)) {
+            return val.map(item => formatValue(item)).join('<br><br>');
+        } else if (typeof val === 'object' && val !== null) {
+            return Object.entries(val)
+                .map(([k, v]) => `<span style="color: var(--text-muted); font-size: 0.8em; text-transform: uppercase;">${k.replace(/_/g, ' ')}:</span> ${formatValue(v)}`)
+                .join('<br>');
+        }
+        return val;
+    }
+
+    function renderResults(data) {
+        statusEl.style.display = 'none';
+        resultsEl.style.display = 'block';
+
+        // Check for document_type or form_type depending on what the LLM outputs
+        const docType = data.document_type || data.form_type || 'Unknown Type';
+        formType.innerText = docType;
+
+        // Render Fields
+        fieldsContainer.innerHTML = '';
+        
+        // Use extracted_data if it exists, otherwise fall back to the root object (excluding document_type)
+        let extractedData = data.extracted_data || data;
+        
+        for (const [key, value] of Object.entries(extractedData)) {
+            // Skip the document type since we already show it in the top badge
+            if (key === 'document_type' || key === 'form_type') continue;
+
+            const cleanKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const displayValue = formatValue(value);
+            
+            const row = document.createElement('div');
+            row.className = 'field-row';
+            row.innerHTML = `<div class="field-key">${cleanKey}</div><div class="field-val" style="text-align: right;">${displayValue || '-'}</div>`;
+            fieldsContainer.appendChild(row);
+        }
+
+        // Render Raw JSON
+        jsonOutput.innerText = JSON.stringify(data, null, 2);
+    }
+</script>
+
+</body>
+</html>
